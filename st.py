@@ -7,36 +7,58 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
-def make_data():
-    df = pd.read_csv('./dataset/cybersecurity_attacks.csv')
+def make_data(path='./dataset/cybersecurity_attacks.csv', Diagnostics=False, Statistics=False):
+    """
+    Загружает и агрегирует данные кибератак по дням для последующего прогнозирования.
+
+    Параметры:
+    ----------
+    path : str, по умолчанию './dataset/cybersecurity_attacks.csv'
+        Путь к CSV-файлу с сырыми логами.
+    Diagnostics : bool, по умолчанию False
+        Если True — выводит информацию о распределении типов атак в исходных данных.
+    Statistics : bool, по умолчанию False
+        Если True — выводит описательную статистику по ежедневному числу атак (y).
+
+    Возвращает:
+    -----------
+    pd.DataFrame
+        Датафрейм с колонками: 'ds' (дата), 'y' (число атак), 'unique_id' (идентификатор ряда).
+    """
+    df = pd.read_csv(path)
     df['Timestamp'] = pd.to_datetime(df['Timestamp'])
 
-    # Диагностика: сколько всего записей и сколько атак?
-    total_rows = len(df)
+    # ВСЕГДА создаём очищенную колонку — она нужна для логики
     df['Attack Type Clean'] = df['Attack Type'].fillna('Normal').astype(str).str.strip()
-    attack_rows = (df['Attack Type Clean'].str.lower() != 'normal').sum()
-    print(f"Всего строк: {total_rows}")
-    print(f"Строк с атаками: {attack_rows} ({attack_rows / total_rows:.1%})")
-    print("Уникальные значения 'Attack Type':")
-    print(df['Attack Type Clean'].value_counts().head(10))
 
-    # Определяем атаки
+    # Диагностика — только по запросу
+    if Diagnostics:
+        total_rows = len(df)
+        attack_rows = (df['Attack Type Clean'].str.lower() != 'normal').sum()
+        print(f"Всего строк: {total_rows}")
+        print(f"Строк с атаками: {attack_rows} ({attack_rows / total_rows:.1%})")
+        print("Уникальные значения 'Attack Type':")
+        print(df['Attack Type Clean'].value_counts().head(10))
+
+    # Теперь безопасно использовать 'Attack Type Clean'
     df['is_attack'] = df['Attack Type Clean'].str.lower() != 'normal'
 
     # Агрегация по дням
     daily = df.groupby(df['Timestamp'].dt.floor('D')).agg(
         y=('is_attack', 'sum')
     ).reset_index()
-    print(f"\nАгрегировано дней: {len(daily)}")
-    print("Статистика по y (атак в день):")
-    print(daily['y'].describe())
-    print("Топ-5 дней по числу атак:")
-    print(daily.nlargest(5, 'y'))
+
+    if Statistics:
+        print(f"\nАгрегировано дней: {len(daily)}")
+        print("Статистика по y (атак в день):")
+        print(daily['y'].describe())
+        print("Топ-5 дней по числу атак:")
+        print(daily.nlargest(5, 'y'))
 
     daily.rename(columns={'Timestamp': 'ds'}, inplace=True)
     daily['unique_id'] = 'total'
 
-    # Полная временная сетка
+    # Полная временная сетка (без пропусков)
     date_range = pd.date_range(start=daily['ds'].min(), end=daily['ds'].max(), freq='D')
     full_df = pd.DataFrame({'ds': date_range})
     full_df = pd.merge(full_df, daily[['ds', 'y']], on='ds', how='left')
