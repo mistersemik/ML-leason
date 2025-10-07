@@ -142,8 +142,10 @@ def main(horizon=35, freq='D', lags=[1, 2, 3, 7, 14, 30], dayplot=60):
     for model in preds.columns[2:]:
         mae = mean_absolute_error(test['y'], preds[model])
         rmse = np.sqrt(mean_squared_error(test['y'], preds[model]))
-        mae_pct = mae / test['y'].mean() * 100
-        print(f"{model}: MAE = {mae:.2f} ({mae_pct:.1f}%), RMSE = {rmse:.2f}")
+        mean_y = test['y'].mean()
+        mae_pct = mae / mean_y * 100
+        rmse_pct = rmse / mean_y * 100
+        print(f"{model}: MAE = {mae:.2f} ({mae_pct:.1f}%), RMSE = {rmse:.2f} ({rmse_pct:.1f}%)")
 
     # === Визуализация ===
     plt.figure(figsize=(12, 6))
